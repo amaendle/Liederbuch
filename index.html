@@ -110,7 +110,7 @@
     <div id="preview"></div>
     <div id="note">--</div>
     <p id="lyric">--</p>
-    <div>
+    <div style="display:none">
       <button id="prevSong">⏮️ Voriges Lied</button>
       <button id="startBtn">🎙️ Starten</button>
       <button id="nextSong">⏭️ Nächstes Lied</button>
@@ -1228,6 +1228,8 @@
           if (bestDistance < MAX_NOTE_DISTANCE && detectedNote) {
             document.body.style.backgroundColor = noteColors[detectedNote] || "var(--neutral)";
           }
+
+          noteEl.textContent = pitch.toFixed(1) + " Hz";
 
           // Match‑Logik
           const adjusted = pitch * bestFactor;
