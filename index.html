@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Liedauswahl & Spieler</title>
+  <style>
+    :root { --neutral:#eee; }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #f8f8f8;
+      text-align: center;
+      padding: 2em;
+      transition: background-color 0.1s ease;
+    }
+
+    /* Menu */
+    h1 {
+      text-align: center;
+      padding: 1rem;
+      background: #ffd966;
+      margin: 0 0 1rem 0;
+      border-radius: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .tile {
+      background: white;
+      border-radius: 12px;
+      aspect-ratio: 1 / 1;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+      padding: 1rem;
+    }
+    .tile:hover { transform: scale(1.05); }
+    .emoji { font-size: 4rem; margin-bottom: 0.5rem; }
+    .title { font-size: .95rem; text-align: center; line-height: 1.2; }
+
+    /* Player */
+    #playerView { display: none; }
+    #songTitle { font-size: 2rem; margin-bottom: .2em; }
+    #songEmoji { font-size: 7rem; margin-bottom: .2em; cursor: pointer; }
+    #note { font-size: 1rem; margin: .4em; opacity: .7; }
+    #lyric { font-size: 1.8rem; margin-bottom: 1em; }
+    #playHint {
+      display: inline-block;
+      padding: 1em 2em;
+      font-size: 2.2rem;
+      font-weight: bold;
+      border-radius: 1em;
+      margin: 0.3em auto;
+      background-color: var(--neutral);
+      color: black;
+      transition: transform .1s ease, opacity .1s ease;
+      cursor: pointer;
+      border: 5px solid #999;
+    }
+    .previewBox {
+      display: block;
+      padding: .6em 1.2em;
+      font-size: 1.6rem;
+      font-weight: bold;
+      border-radius: .8em;
+      margin: .3em auto;
+      background-color: #ccc;
+      opacity: .6;
+      width: fit-content;
+      transition: all .3s ease;
+    }
+    .success { border-color: transparent !important; }
+
+    button {
+      font-size: 1.1rem;
+      padding: .6em 1.2em;
+      margin: .4em;
+      cursor: pointer;
+      border-radius: 10px;
+      border: 1px solid #bbb;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MENU -->
+  <div id="menuView">
+    <h1>🎵 Liederbibliothek</h1>
+    <div class="grid" id="songGrid"></div>
+  </div>
+
+  <!-- PLAYER -->
+  <div id="playerView">
+    <div id="songTitle"></div>
+    <div id="songEmoji" title="Zurück zur Liedauswahl"></div>
+    <div id="playHint"><span id="playNote">--</span></div>
+    <div id="preview"></div>
+    <div id="note">--</div>
+    <p id="lyric">--</p>
+    <div>
+      <button id="prevSong">⏮️ Voriges Lied</button>
+      <button id="startBtn">🎙️ Starten</button>
+      <button id="nextSong">⏭️ Nächstes Lied</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { PitchDetector } from "https://esm.sh/pitchy@4";
+
+    /* -------------------- SONGS -------------------- */
+    const songData = {
+      alle_meine_entchen: {
+        title: "🦆 Alle meine Entchen",
+        emoji: "🦆",
+        timeSig: "4/4",
+        verses: [{
+          notes: [
+            ["c/4","4"],["d/4","4"],["e/4","4"],["f/4","4"],
+            ["g/4","2"],["g/4","2"],
+            ["a/4","4"],["a/4","4"],["a/4","4"],["a/4","4"],
+            ["g/4","1"],
+            ["a/4","4"],["a/4","4"],["a/4","4"],["a/4","4"],
+            ["g/4","1"],
+            ["f/4","4"],["f/4","4"],["f/4","4"],["f/4","4"],
+            ["e/4","2"],["e/4","2"],
+            ["d/4","4"],["d/4","4"],["d/4","4"],["d/4","4"],
+            ["c/4","1"]
+          ],
+          lyrics: [
+            "Al-","le","mei-","ne","Ent-","chen",
+            "schwim-","men","auf","dem","See,",
+            "schwim-","men","auf","dem","See,",
+            "Köpf-","chen","in","das","Was-","ser,",
+            "Schwänz-","chen","in","die","Höh’!"
+          ]
+        }]
+      },
+      auf_der_mauer: {
+        title: "🪳 Auf der Mauer, auf der Lauer",
+        emoji: "🪳",
+        timeSig: "4/4",
+        verses: [{
+          notes: [
+            ["c/4","4"],["c/4","4"],["c/4","4"],["d/4","4"],
+            ["e/4","4"],["e/4","4"],["e/4","4"],["e/4","4"],
+            ["d/4","4"],["d/4","4"],["d/4","4"],["e/4","4"],
+            ["c/4","2"],["c/4","2"],["4r","4r"],
+            ["e/4","4"],["e/4","4"],["e/4","4"],["f/4","4"],
+            ["g/4","4"],["g/4","4"],["g/4","4"],["g/4","4"],
+            ["f/4","4"],["e/4","4"],["f/4","4"],["g/4","4"],
+            ["e/4","2d"],["e/4","2d"]
+          ],
+          lyrics: [
+            "Auf","der","Mau-","er,","auf","der","Lau-","er,",
+            "sitzt","’ne","klei-","ne",
+            "Wan-","ze.","—","—",
+            "Auf","der","Mau-","er,","auf","der",
+            "Lau-","er,","sitzt","’ne",
+            "klei-","ne","Wan-","ze."
+          ]
+        }]
+      }
+    };
+
+    /* -------------------- UI REFS -------------------- */
+    const menuView   = document.getElementById("menuView");
+    const playerView = document.getElementById("playerView");
+    const songGrid   = document.getElementById("songGrid");
+
+    const songTitle  = document.getElementById("songTitle");
+    const songEmoji  = document.getElementById("songEmoji");
+    const playHint   = document.getElementById("playHint");
+    const playNote   = document.getElementById("playNote");
+    const previewEl  = document.getElementById("preview");
+    const lyricEl    = document.getElementById("lyric");
+    const noteEl     = document.getElementById("note");
+
+    const prevSongBtn = document.getElementById("prevSong");
+    const startBtn    = document.getElementById("startBtn");
+    const nextSongBtn = document.getElementById("nextSong");
+
+    /* -------------------- CONSTANTS -------------------- */
+    const noteColors = {
+      C4:"red", D4:"orange", E4:"gold", F4:"green",
+      G4:"cyan", A4:"blue", B4:"brown", C5:"magenta"
+    };
+    const HARMONIC_CANDIDATES = [1, 0.5, 0.25];
+    const CLARITY_MIN = 0.9;
+    const MATCH_HOLD_MS = 250;
+    const MAX_NOTE_DISTANCE = 40;
+    let   fullNoteLen = 1000;
+
+    /* -------------------- STATE -------------------- */
+    const songKeys = Object.keys(songData);
+    let currentSongIndex = 0;
+    let currentVerse = songData[songKeys[0]].verses[0];
+    let index = 0;
+
+    let audioCtx = null, micStream = null, detector = null;
+    let isLocked = false, matchStartTime = null;
+
+    let lastPitch = null, lastVolume = 0, lastIndex = -1;
+    let harmonicFactor = 1, lastMismatchTime = null;
+
+    // Adaptive Lautstärke
+    let maxVolumeSeen = 0;
+    let minVolumeSeen = Infinity;
+    let recentVolumes = [];
+    const RECENT_VOLUME_WINDOW = 5000; // ms
+
+    /* -------------------- HELPERS -------------------- */
+    function normalizeNote(noteStr) {
+      const [letter, octave] = (noteStr || "").split("/");
+      return (letter || "").toUpperCase() + (octave || "");
+    }
+    function noteToFreq(note) {
+      const map = { C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88, C5:523.25 };
+      return map[note] || 0;
+    }
+    function parseNoteDuration(value) {
+      if (!value) return { duration: fullNoteLen/4, isRest:false };
+      const isRest   = /r/i.test(value);
+      const isDotted = /d/i.test(value);
+      const baseNumber = parseInt(String(value).replace(/[rd]/gi,""), 10);
+      const base = (!baseNumber || baseNumber < 1) ? 4 : baseNumber;
+      let duration = fullNoteLen / base;
+      if (isDotted) duration *= 1.5;
+      return { duration, isRest };
+    }
+
+    function updateDisplay() {
+      const song = songData[songKeys[currentSongIndex]];
+      const [noteRaw] = currentVerse.notes[index] || [null];
+      const note = noteRaw ? normalizeNote(noteRaw) : null;
+      const lyric = currentVerse.lyrics[index] || "";
+      const color = noteColors[note] || "#999";
+
+      songTitle.textContent = song.title;
+      songEmoji.textContent = song.emoji;
+
+      playNote.textContent = note || "🎉";
+      playHint.style.backgroundColor = color;
+      lyricEl.textContent = lyric;
+
+      previewEl.innerHTML = "";
+      for (let i = 1; i <= 2; i++) {
+        const next = currentVerse.notes[index + i];
+        if (!next) break;
+        const [n] = next;
+        const nNorm = normalizeNote(n);
+        const box = document.createElement("div");
+        box.className = "previewBox";
+        box.textContent = nNorm;
+        box.style.backgroundColor = noteColors[nNorm] || "#ccc";
+        previewEl.appendChild(box);
+      }
+    }
+
+    // Advance mit korrektem Pausen-Timing: Timer gehört zur Pause selbst
+    function advance() {
+      matchStartTime = null;
+
+      const nextIndex = index + 1;
+      if (nextIndex >= currentVerse.notes.length) {
+        playNote.textContent = "🎉";
+        playHint.style.backgroundColor = "#ccc";
+        lyricEl.textContent = "Fertig!";
+        previewEl.innerHTML = "";
+        return;
+      }
+
+      const [, durRaw] = currentVerse.notes[nextIndex];
+      const { duration, isRest } = parseNoteDuration(durRaw);
+
+      if (isRest) {
+        // Wir springen NICHT sofort weiter – erst Pause abwarten
+        index = nextIndex; // Index zeigt jetzt auf die Pause
+        isLocked = true;
+        document.body.style.backgroundColor = "var(--neutral)";
+        playHint.style.backgroundColor = "var(--neutral)";
+        playNote.textContent = "⏸️";
+        lyricEl.textContent = "";
+        previewEl.innerHTML = "";
+        setTimeout(() => {
+          isLocked = false;
+          // Nach der Pause genau EINE Note weiter (erste klingende nach der Pause)
+          index = Math.min(index + 1, currentVerse.notes.length - 1);
+          updateDisplay();
+          // Kein rekursives advance() hier – die nächste Note wird normal gespielt
+        }, duration);
+      } else {
+        index = nextIndex;
+        updateDisplay();
+      }
+    }
+
+    function showMenu() {
+      playerView.style.display = "none";
+      menuView.style.display = "block";
+      if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(()=>{});
+        audioCtx = null;
+      }
+      detector = null;
+      document.body.style.backgroundColor = "#f8f8f8";
+    }
+
+    function startPlayer(songId) {
+      currentSongIndex = songKeys.indexOf(songId);
+      currentVerse = songData[songId].verses[0];
+      index = 0;
+      maxVolumeSeen = 0;
+      minVolumeSeen = Infinity;
+      recentVolumes = [];
+      menuView.style.display = "none";
+      playerView.style.display = "block";
+      updateDisplay();
+      setupAudio();
+    }
+
+    async function setupAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const source = audioCtx.createMediaStreamSource(micStream);
+      const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+      detector = PitchDetector.forFloat32Array(2048);
+
+      processor.onaudioprocess = (e) => {
+        if (isLocked) return;
+        const input = e.inputBuffer.getChannelData(0);
+        const sr = e.inputBuffer.sampleRate;
+
+        const [pitch, clarity] = detector.findPitch(input, sr);
+        const volume = Math.sqrt(input.reduce((s, v) => s + v*v, 0) / input.length);
+
+        // Adaptive Lautstärke
+        maxVolumeSeen = Math.max(maxVolumeSeen, volume);
+        minVolumeSeen = Math.min(minVolumeSeen, volume);
+
+        const now = performance.now();
+        recentVolumes.push({ time: now, value: volume });
+        while (recentVolumes.length && now - recentVolumes[0].time > RECENT_VOLUME_WINDOW) {
+          recentVolumes.shift();
+        }
+        const maxRecentVolume = recentVolumes.reduce((m, r) => Math.max(m, r.value), 0);
+        const recentRange = Math.max(0, maxRecentVolume - minVolumeSeen);
+        const silenceThreshold = minVolumeSeen + 0.1 * recentRange;
+
+        // Unter Schwelle: neutraler Hintergrund
+        if (recentRange > 0.0101 && volume < silenceThreshold) {
+          noteEl.textContent = "--";
+          document.body.style.backgroundColor = "var(--neutral)";
+          return;
+        }
+
+        const current = currentVerse.notes[index];
+        if (!current) return;
+        const [targetRaw, targetDurRaw] = current;
+        const target = normalizeNote(targetRaw);
+        const expectedFreq = noteToFreq(target);
+        const { duration: targetDuration } = parseNoteDuration(targetDurRaw);
+
+        if (clarity > CLARITY_MIN && pitch) {
+          // Harmonik‑Suche
+          let detectedNote = null;
+          let bestDistance = Infinity;
+          let bestFactor = 1;
+
+          for (const factor of HARMONIC_CANDIDATES) {
+            const adjusted = pitch * factor;
+            for (const note of Object.keys(noteColors)) {
+              const dist = Math.abs(noteToFreq(note) - adjusted);
+              if (dist < bestDistance) {
+                bestDistance = dist;
+                detectedNote = note;
+                bestFactor = factor;
+              }
+            }
+          }
+
+          // Laut genug: Hintergrund = erkannte Notenfarbe (wenn plausibel)
+          if (bestDistance < MAX_NOTE_DISTANCE && detectedNote) {
+            document.body.style.backgroundColor = noteColors[detectedNote] || "var(--neutral)";
+          }
+
+          // Match‑Logik
+          const adjusted = pitch * bestFactor;
+          const isSameNote = (detectedNote === target);
+          const isRepeat   = lastPitch && Math.abs(adjusted - lastPitch) < 15;
+          const quieter    = volume <= lastVolume * 1.1;
+
+          if (isSameNote && (!isRepeat || !quieter)) {
+            if (!matchStartTime) matchStartTime = performance.now();
+          } else {
+            if (!isSameNote) matchStartTime = null;
+          }
+
+          if (isSameNote && matchStartTime && (performance.now() - matchStartTime > MATCH_HOLD_MS)) {
+            isLocked = true;
+            playHint.classList.add("success");
+            lastIndex = index;
+            setTimeout(() => {
+              advance();
+              isLocked = false;
+              playHint.classList.remove("success");
+            }, Math.max(150, Math.round(targetDuration * 0.4)));
+          }
+
+          lastPitch = adjusted;
+          lastVolume = volume;
+        } else {
+          noteEl.textContent = "--";
+          matchStartTime = null;
+        }
+      };
+    }
+
+    /* -------------------- GRID / NAV -------------------- */
+    for (const [id, song] of Object.entries(songData)) {
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.innerHTML = `
+        <div class="emoji">${song.emoji}</div>
+        <div class="title">${song.title.replace(song.emoji+" ", "")}</div>`;
+      tile.addEventListener("click", () => startPlayer(id));
+      songGrid.appendChild(tile);
+    }
+
+    playHint.addEventListener("click", () => { if (!isLocked) advance(); });
+    songEmoji.addEventListener("click", showMenu);
+    startBtn.addEventListener("click", () => setupAudio());
+
+    prevSongBtn.addEventListener("click", () => {
+      currentSongIndex = (currentSongIndex - 1 + songKeys.length) % songKeys.length;
+      currentVerse = songData[songKeys[currentSongIndex]].verses[0];
+      index = 0;
+      updateDisplay();
+    });
+    nextSongBtn.addEventListener("click", () => {
+      currentSongIndex = (currentSongIndex + 1) % songKeys.length;
+      currentVerse = songData[songKeys[currentSongIndex]].verses[0];
+      index = 0;
+      updateDisplay();
+    });
+
+    // Start im Menü
+    (function init() {
+      document.body.style.backgroundColor = "#f8f8f8";
+    })();
+  </script>
+</body>
+</html>
